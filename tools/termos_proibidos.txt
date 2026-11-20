@@ -1,0 +1,13 @@
+# Lista de Termos_Proibidos usada por tools/verificador_seguranca.py.
+#
+# Formato:
+#   - Um termo por linha.
+#   - Linhas vazias e linhas iniciadas por "#" são ignoradas.
+#   - A comparação não diferencia maiúsculas de minúsculas e procura o termo
+#     em nomes de arquivos, nomes de pastas e conteúdo de arquivos de texto.
+#   - Espaços no início e no fim de cada linha são removidos.
+#
+# Este arquivo é excluído da verificação de forma explícita pelo verificador
+# (caso contrário, os próprios termos seriam sempre encontrados).
+#
+# PENDENTE: preencha abaixo, com os termos definidos por você, um por linha.

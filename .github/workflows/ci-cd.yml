@@ -1,0 +1,82 @@
+# Workflow de CI/CD do Function_App.
+# - Em pull request: roda somente o job "testes".
+# - Em push na branch principal: roda "testes" e, se passarem, o job "deploy".
+# Autenticação no Azure por OIDC (identidade federada), sem client secret.
+name: ci-cd
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Permissão mínima padrão para todos os jobs.
+# O id-token: write é concedido apenas no job de deploy (necessário ao OIDC).
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    name: Verificação, build e testes
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Baixa o código do repositório.
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 2. Verificador de segurança e de termos: roda ANTES de build e deploy.
+      #    Se retornar código diferente de zero, o job falha e as etapas seguintes não rodam.
+      - name: Verificador de segurança e de termos
+        run: python tools/verificador_seguranca.py
+
+      # 3. Instalação de dependências.
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt -r src/requirements.txt
+
+      # 4. Compilação (verifica erros de sintaxe).
+      - name: Compilar
+        run: python -m compileall src
+
+      # 5. Testes.
+      - name: Testes
+        run: python -m pytest -q
+
+  deploy:
+    name: Deploy no Azure
+    # Só executa se o job de testes concluir com sucesso.
+    needs: testes
+    # Deploy somente em push na branch principal (nunca em pull request).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # Environment "production": permite revisores obrigatórios antes do deploy.
+    environment: production
+    # Permissões do job: id-token: write é necessário para o login OIDC.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Login por OIDC: sem client secret. Os IDs vêm de Secrets/Variables do repositório.
+      - name: Login no Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Publicação da pasta src; as dependências são instaladas no build remoto (Oryx).
+      - name: Publicar Function_App
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.AZURE_FUNCTIONAPP_NAME }}
+          package: src
+          scm-do-build-during-deployment: true
+          enable-oryx-build: true

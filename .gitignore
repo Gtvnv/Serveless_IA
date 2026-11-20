@@ -1,0 +1,11 @@
+local.settings.json
+.env
+.env.*
+bin/
+obj/
+node_modules/
+.venv/
+packages/
+__pycache__/
+.pytest_cache/
+.hypothesis/
